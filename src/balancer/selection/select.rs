@@ -35,7 +35,7 @@ pub fn pick(list: &mut [Rpc], route_group: &RouteGroup) -> (Rpc, Option<usize>) 
         .collect::<Vec<_>>();
     // If len is 1, return the only element
     if filtered_list.len() == 1 {
-        return (list[0].clone(), Some(0));
+        return (filtered_list[0].inner().clone(), Some(filtered_list[0].idx));
     } else if filtered_list.is_empty() {
         return (Rpc::default(), None);
     }
@@ -236,5 +236,30 @@ mod tests {
         println!("rpc index: {:?}", index);
         assert_eq!(rpc.status.latency, 7.0);
         assert_eq!(index, Some(1));
+    }
+
+    #[test]
+    fn test_pick_correct_group() {
+        let mut rpc_list = vec![
+            Rpc::default().with_route_group(RouteGroup::StrataCL),
+            Rpc::default().with_route_group(RouteGroup::Ethereum),
+        ];
+
+        let (rpc, _) = pick(&mut rpc_list, &RouteGroup::StrataCL);
+        assert_eq!(rpc.group, RouteGroup::StrataCL);
+
+        let (rpc, _) = pick(&mut rpc_list, &RouteGroup::Ethereum);
+        assert_eq!(rpc.group, RouteGroup::Ethereum);
+
+        let mut rpc_list = vec![
+            Rpc::default().with_route_group(RouteGroup::Ethereum),
+            Rpc::default().with_route_group(RouteGroup::Ethereum),
+        ];
+
+        let (_, index) = pick(&mut rpc_list, &RouteGroup::StrataCL);
+        assert_eq!(index, None);
+
+        let (rpc, _) = pick(&mut rpc_list, &RouteGroup::Ethereum);
+        assert_eq!(rpc.group, RouteGroup::Ethereum);
     }
 }
