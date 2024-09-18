@@ -12,7 +12,10 @@ use crate::{
     db_get,
     rpc::{
         method::EthRpcMethod,
-        types::Rpc,
+        types::{
+            RouteGroup,
+            Rpc,
+        },
     },
     websocket::{
         error::WsError,
@@ -143,7 +146,12 @@ async fn handle_incoming_message(
             e.into_inner()
         });
 
-        match pick(&mut rpc_list_guard).1 {
+        let route_group = incoming["method"]
+            .as_str()
+            .map(RouteGroup::from_method_name)
+            .unwrap_or_default();
+
+        match pick(&mut rpc_list_guard, &route_group).1 {
             Some(position) => position,
             None => {
                 // Check if the incoming content is a subscription.

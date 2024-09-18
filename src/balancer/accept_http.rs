@@ -16,7 +16,10 @@ use crate::{
     db_get,
     no_rpc_available,
     print_cache_error,
-    rpc::types::Rpc,
+    rpc::types::{
+        RouteGroup,
+        Rpc,
+    },
     rpc_response,
     timed_out,
     websocket::{
@@ -219,6 +222,11 @@ macro_rules! fetch_from_rpc {
         // Kinda jank but set the id back to what it was before
         $tx["id"] = $id.into();
 
+        let route_group = $tx["method"]
+            .as_str()
+            .map(RouteGroup::from_method_name)
+            .unwrap_or_default();
+
         // Loop until we get a response
         let mut rx;
         let mut retries = 0;
@@ -231,7 +239,7 @@ macro_rules! fetch_from_rpc {
                     e.into_inner()
                 });
 
-                (rpc, $rpc_position) = pick(&mut rpc_list_guard);
+                (rpc, $rpc_position) = pick(&mut rpc_list_guard, &route_group);
             }
             tracing::info!(rpc.name, "Forwarding to");
 
