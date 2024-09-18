@@ -12,6 +12,7 @@ use crate::{
             sled_config::SledConfigRepr,
         },
     },
+    rpc::types::RouteGroup,
     Rpc,
 };
 use clap::{
@@ -470,6 +471,11 @@ impl Settings {
                                     is_ws = false;
                                 }
 
+                                let group = rpc
+                                    .get("group")
+                                    .and_then(|g| g.as_str());
+                                let route_group = RouteGroup::from_config(group);
+
                                 Rpc::new(
                                     url,
                                     ws_url,
@@ -477,6 +483,7 @@ impl Settings {
                                     delta.into(),
                                     settings.ma_length,
                                 )
+                                .with_route_group(route_group)
                             })
                             .collect::<Vec<Rpc>>()
                     })
