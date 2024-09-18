@@ -50,7 +50,7 @@ impl RouteGroup {
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,           // sanitized name for appearing in logs
-    pub group: RouteGroup,
+    pub group: RouteGroup,      // rpc subsets
     url: String,                // url of the rpc we're forwarding requests to.
     client: Client,             // Reqwest client
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
@@ -165,6 +165,11 @@ impl Rpc {
 
     /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(0);
+        }
+
         let request = json!({
             "method": "eth_blockNumber".to_string(),
             "params": serde_json::Value::Null,
@@ -180,6 +185,11 @@ impl Rpc {
 
     /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(false);
+        }
+
         let request = json!({
             "method": "eth_syncing".to_string(),
             "params": serde_json::Value::Null,
@@ -195,6 +205,11 @@ impl Rpc {
 
     /// Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(0);
+        }
+
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
             "params": ["finalized", false],

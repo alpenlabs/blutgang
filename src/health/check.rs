@@ -3,27 +3,19 @@ use crate::{
         HealthState,
         LiveReadyUpdate,
         LiveReadyUpdateSnd,
-    },
-    health::{
+    }, health::{
         error::HealthError,
         safe_block::{
             get_safe_block,
             NamedBlocknumbers,
         },
-    },
-    log_info,
-    log_wrn,
-    websocket::{
+    }, log_info, log_wrn, rpc::types::RouteGroup, websocket::{
         subscription_manager::move_subscriptions,
         types::{
             WsChannelErr,
             WsconnMessage,
         },
-    },
-    IncomingResponse,
-    Rpc,
-    Settings,
-    SubscriptionData,
+    }, IncomingResponse, Rpc, Settings, SubscriptionData
 };
 
 use std::{
@@ -236,6 +228,11 @@ fn make_poverty(
 
     for head in heads {
         if head.reported_head < highest_head || head.is_syncing {
+            // skip head checks on alp rpc calls
+            if rpc_list_guard[head.rpc_list_index].group == RouteGroup::StrataCL {
+                continue;
+            }
+
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
             log_wrn!(
