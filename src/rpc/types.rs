@@ -54,7 +54,7 @@ impl RouteGroup {
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,             // sanitized name for appearing in logs
-    pub group: RouteGroup,
+    pub group: RouteGroup,        // rpc subsets
     url: url::Url,                // url of the rpc we're forwarding requests to.
     client: Client,               // Reqwest client
     pub ws_url: Option<url::Url>, // url of the websocket we're forwarding requests to.
@@ -159,6 +159,11 @@ impl Rpc {
 
     /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(0);
+        }
+
         let method = EthRpcMethod::BlockNumber;
         let request = json!({
             "method": method,
@@ -184,6 +189,11 @@ impl Rpc {
 
     /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(false);
+        }
+
         let method = EthRpcMethod::Syncing;
         let request = json!({
             "method": method,
@@ -209,6 +219,11 @@ impl Rpc {
 
     /// Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(0);
+        }
+
         let method = EthRpcMethod::GetBlockByNumber;
         let request = json!({
             "method": method,
