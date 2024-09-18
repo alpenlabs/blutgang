@@ -23,9 +23,34 @@ pub struct Status {
     // pub throughput: f64,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum RouteGroup {
+    #[default]
+    Ethereum,
+    StrataCL,
+}
+
+impl RouteGroup {
+    pub fn from_method_name(method_name: &str) -> Self {
+        if method_name.starts_with("alp_") {
+            Self::StrataCL
+        } else {
+            Self::Ethereum
+        }
+    }
+
+    pub fn from_config(group: Option<&str>) -> Self {
+        match group {
+            Some("strata") => Self::StrataCL,
+            _ => Self::Ethereum,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,           // sanitized name for appearing in logs
+    pub group: RouteGroup,
     url: String,                // url of the rpc we're forwarding requests to.
     client: Client,             // Reqwest client
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
@@ -63,6 +88,7 @@ impl Default for Rpc {
     fn default() -> Self {
         Self {
             name: "".to_string(),
+            group: RouteGroup::default(),
             url: "".to_string(),
             ws_url: None,
             client: Client::new(),
@@ -86,6 +112,7 @@ impl Rpc {
     ) -> Self {
         Self {
             name: sanitize_url(&url).unwrap_or(url.clone()),
+            group: RouteGroup::default(),
             url,
             client: Client::new(),
             ws_url,
@@ -98,6 +125,11 @@ impl Rpc {
             last_used: 0,
             min_time_delta,
         }
+    }
+
+    pub fn with_route_group(mut self, group: RouteGroup) -> Self {
+        self.group = group;
+        self
     }
 
     /// Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth

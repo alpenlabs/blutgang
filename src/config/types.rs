@@ -2,6 +2,7 @@ use crate::{
     config::setup::sort_by_latency,
     log_info,
     log_wrn,
+    rpc::types::RouteGroup,
     Rpc,
 };
 use clap::{
@@ -283,6 +284,9 @@ impl Settings {
             if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
 
+                let group = rpc_table.get("group").and_then(|s| s.as_str());
+                let route_group = RouteGroup::from_config(group);
+
                 let max_consecutive = rpc_table
                     .get("max_consecutive")
                     .expect("\x1b[31mErr:\x1b[0m Missing max_consecutive from an RPC!")
@@ -328,7 +332,8 @@ impl Settings {
                     }
                 };
 
-                let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length);
+                let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length)
+                    .with_route_group(route_group);
                 rpc_list.push(rpc);
             }
         }
