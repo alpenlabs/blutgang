@@ -285,7 +285,7 @@ impl Settings {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
 
                 let group = rpc_table.get("group").and_then(|s| s.as_str());
-                let route_group = RouteGroup::from_config(group);
+                let route_group = RouteGroup::from_config(group).unwrap();
 
                 let max_consecutive = rpc_table
                     .get("max_consecutive")
