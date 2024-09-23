@@ -474,7 +474,8 @@ impl Settings {
                                 let group = rpc
                                     .get("group")
                                     .and_then(|g| g.as_str());
-                                let route_group = RouteGroup::from_config(group);
+                                let route_group = RouteGroup::from_config(group)
+                                    .expect("invalid route group in rpc config");
 
                                 Rpc::new(
                                     url,

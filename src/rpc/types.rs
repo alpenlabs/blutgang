@@ -4,6 +4,7 @@ use crate::rpc::{
 };
 use reqwest::Client;
 use rust_tracing::deps::metrics;
+use thiserror::Error;
 use url::Url;
 
 use serde_json::{
@@ -43,12 +44,19 @@ impl RouteGroup {
         }
     }
 
-    pub fn from_config(group: Option<&str>) -> Self {
+    pub fn from_config(group: Option<&str>) -> Result<Self, RouteGroupError> {
         match group {
-            Some("strata") => Self::StrataCL,
-            _ => Self::Ethereum,
+            Some("strata") => Ok(Self::StrataCL),
+            Some("ethereum") | None => Ok(Self::Ethereum),
+            Some(unknown_group) => Err(RouteGroupError::UnknownGroup(unknown_group)),
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum RouteGroupError<'a> {
+    #[error("Unknown group \"{0}\"")]
+    UnknownGroup(&'a str),
 }
 
 #[derive(Debug, Clone)]
@@ -160,7 +168,7 @@ impl Rpc {
     /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
         // skip sync check on strata rpc
-        if self.group == RouteGroup::StrataCL {
+        if self.group != RouteGroup::Ethereum {
             return Ok(0);
         }
 
@@ -190,7 +198,7 @@ impl Rpc {
     /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
         // skip sync check on strata rpc
-        if self.group == RouteGroup::StrataCL {
+        if self.group != RouteGroup::Ethereum {
             return Ok(false);
         }
 
