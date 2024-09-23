@@ -70,3 +70,12 @@ ws_url = "wss://eth.merkle.io"
 max_consecutive = 150
 # Max amount of queries per second.
 max_per_second = 200
+
+[strata]
+url = "https://strata.merkle.io"
+ws_url = "wss://strata.merkle.io"
+# The maximum amount of time we can use this rpc in a row.
+max_consecutive = 150
+# Max amount of queries per second.
+max_per_second = 200
+group = "strata"
