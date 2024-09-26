@@ -1,5 +1,6 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
+use thiserror::Error;
 use url::Url;
 
 use serde_json::{
@@ -23,9 +24,41 @@ pub struct Status {
     // pub throughput: f64,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum RouteGroup {
+    #[default]
+    Ethereum,
+    StrataCL,
+}
+
+impl RouteGroup {
+    pub fn from_method_name(method_name: &str) -> Self {
+        if method_name.starts_with("alp_") {
+            Self::StrataCL
+        } else {
+            Self::Ethereum
+        }
+    }
+
+    pub fn from_config(group: Option<&str>) -> Result<Self, RouteGroupError> {
+        match group {
+            Some("strata") => Ok(Self::StrataCL),
+            Some("ethereum") | None => Ok(Self::Ethereum),
+            Some(unknown_group) => Err(RouteGroupError::UnknownGroup(unknown_group)),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum RouteGroupError<'a> {
+    #[error("Unknown group \"{0}\"")]
+    UnknownGroup(&'a str),
+}
+
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,           // sanitized name for appearing in logs
+    pub group: RouteGroup,      // rpc subsets
     url: String,                // url of the rpc we're forwarding requests to.
     client: Client,             // Reqwest client
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
@@ -63,6 +96,7 @@ impl Default for Rpc {
     fn default() -> Self {
         Self {
             name: "".to_string(),
+            group: RouteGroup::default(),
             url: "".to_string(),
             ws_url: None,
             client: Client::new(),
@@ -86,6 +120,7 @@ impl Rpc {
     ) -> Self {
         Self {
             name: sanitize_url(&url).unwrap_or(url.clone()),
+            group: RouteGroup::default(),
             url,
             client: Client::new(),
             ws_url,
@@ -98,6 +133,11 @@ impl Rpc {
             last_used: 0,
             min_time_delta,
         }
+    }
+
+    pub fn with_route_group(mut self, group: RouteGroup) -> Self {
+        self.group = group;
+        self
     }
 
     /// Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth
@@ -133,6 +173,11 @@ impl Rpc {
 
     /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group != RouteGroup::Ethereum {
+            return Ok(0);
+        }
+
         let request = json!({
             "method": "eth_blockNumber".to_string(),
             "params": serde_json::Value::Null,
@@ -148,6 +193,11 @@ impl Rpc {
 
     /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group != RouteGroup::Ethereum {
+            return Ok(false);
+        }
+
         let request = json!({
             "method": "eth_syncing".to_string(),
             "params": serde_json::Value::Null,
@@ -163,6 +213,11 @@ impl Rpc {
 
     /// Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        // skip sync check on strata rpc
+        if self.group == RouteGroup::StrataCL {
+            return Ok(0);
+        }
+
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
             "params": ["finalized", false],

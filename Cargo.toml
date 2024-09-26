@@ -40,6 +40,7 @@ tungstenite = "0.20.1"
 tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 futures-util = "0.3.29"
 systemd = { version = "0.10.0", optional = true }
+thiserror = "1.0.64"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
