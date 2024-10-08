@@ -5,9 +5,7 @@ use crate::{
             cache_method,
             cache_result,
         },
-    },
-    health::safe_block::NamedBlocknumbers,
-    Rpc,
+    }, health::safe_block::NamedBlocknumbers, log_info, Rpc
 };
 
 use std::{
@@ -74,6 +72,7 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
             // Replace the id with Value::Null and insert the request
             // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
+            log_info!("rx_value in cache_query: {:?}", rx_value);
             rx_value["id"] = Value::Null;
 
             cache_args

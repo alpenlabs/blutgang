@@ -324,6 +324,7 @@ pub async fn execute_ws_call(
         user_id, call
     );
 
+    log_info!("received call: {}", call);
     let id = call["id"].take();
     let tx_hash = {
         #[cfg(not(feature = "xxhash"))]
@@ -338,6 +339,7 @@ pub async fn execute_ws_call(
 
     if let Ok(Some(mut rax)) = cache_args.cache.get(tx_hash.as_bytes()) {
         let mut cached: Value = from_slice(&mut rax).unwrap();
+        log_info!("cached : {}", cached);
         cached["id"] = id;
         return Ok(cached.to_string());
     }

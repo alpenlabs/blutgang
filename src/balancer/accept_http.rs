@@ -196,6 +196,7 @@ macro_rules! get_response {
                 $rpc_position = None;
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                log_info!("Cached value: {:?}", cached);
 
                 cached["id"] = $id.into();
                 cached.to_string()
@@ -339,6 +340,7 @@ async fn forward_body(
 
     // Convert incoming body to serde value
     let mut tx = incoming_to_value(tx).await.unwrap();
+    log_info!("converted incoming_to value: {:?}", tx);
 
     // Get the id of the request and set it to 0 for caching
     //

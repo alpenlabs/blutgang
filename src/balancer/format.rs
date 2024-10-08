@@ -1,4 +1,7 @@
-use crate::NamedBlocknumbers;
+use crate::{
+    log_info,
+    NamedBlocknumbers,
+};
 use http_body_util::BodyExt;
 use hyper::{
     body::Incoming,
@@ -175,7 +178,8 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
 
     let ret = match unsafe { from_str(&mut tx) } {
         Ok(ret) => ret,
-        Err(_) => {
+        Err(e) => {
+            log_info!("Error converting incoming_to_value: {:?}", e);
             // Insane error handling
             let ret = json!({
                 "id": Null,
