@@ -113,6 +113,7 @@ pub async fn cache_query<K, V>(
             //
             // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
+            tracing::info!("rx_value in cache_query: {:?}", rx_value);
             if let Some(id) = rx_value.get_mut("id") {
                 *id = Value::Null;
             } else {

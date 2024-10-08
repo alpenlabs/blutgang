@@ -175,7 +175,8 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
 
     let ret = match unsafe { from_str(&mut tx) } {
         Ok(ret) => ret,
-        Err(_) => {
+        Err(e) => {
+            tracing::info!("Error converting incoming_to_value: {:?}", e);
             // Insane error handling
             let ret = json!({
                 "id": Null,

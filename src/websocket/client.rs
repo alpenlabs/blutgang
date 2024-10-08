@@ -334,6 +334,7 @@ where
         call
     );
 
+    tracing::info!("received call: {}", call);
     let id = call["id"].take();
     let tx_hash = {
         #[cfg(not(feature = "xxhash"))]
@@ -348,6 +349,7 @@ where
 
     if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
         let mut cached: Value = from_slice(rax.as_mut()).unwrap();
+        tracing::info!("cached : {}", cached);
         cached["id"] = id;
         return Ok(cached.to_string());
     }
