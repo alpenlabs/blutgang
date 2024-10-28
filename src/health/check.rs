@@ -229,7 +229,7 @@ fn make_poverty(
     for head in heads {
         if head.reported_head < highest_head || head.is_syncing {
             // skip head checks on alp rpc calls
-            if rpc_list_guard[head.rpc_list_index].group == RouteGroup::StrataCL {
+            if rpc_list_guard[head.rpc_list_index].group != RouteGroup::Ethereum {
                 continue;
             }
 

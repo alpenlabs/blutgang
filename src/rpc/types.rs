@@ -29,12 +29,25 @@ pub enum RouteGroup {
     #[default]
     Ethereum,
     StrataCL,
+    Bundler,
 }
+
+const STRATA_PREFIX: &str = "strata_";
+
+const BUNDLER_METHODS: [&str; 5] = [
+    "eth_sendUserOperation",
+    "eth_estimateUserOperationGas",
+    "eth_getUserOperationByHash",
+    "eth_getUserOperationReceipt",
+    "eth_supportedEntryPoints",
+];
 
 impl RouteGroup {
     pub fn from_method_name(method_name: &str) -> Self {
-        if method_name.starts_with("alp_") {
+        if method_name.starts_with(STRATA_PREFIX) {
             Self::StrataCL
+        } else if BUNDLER_METHODS.contains(&method_name) {
+            Self::Bundler
         } else {
             Self::Ethereum
         }
@@ -43,6 +56,7 @@ impl RouteGroup {
     pub fn from_config(group: Option<&str>) -> Result<Self, RouteGroupError> {
         match group {
             Some("strata") => Ok(Self::StrataCL),
+            Some("bundler") => Ok(Self::Bundler),
             Some("ethereum") | None => Ok(Self::Ethereum),
             Some(unknown_group) => Err(RouteGroupError::UnknownGroup(unknown_group)),
         }
