@@ -364,6 +364,24 @@ macro_rules! fetch_from_rpc_uncached {
     }};
 }
 
+macro_rules! build_json_response {
+    ($status:expr, $raw:expr) => {{
+        // Convert rx to bytes and but it in a Buf
+        let body = hyper::body::Bytes::from($raw);
+
+        // Put it in a http_body_util::Full
+        let body = Full::new(body);
+
+        // Build the response
+        hyper::Response::builder()
+            .status($status)
+            .header("Content-Type", "application/json")
+            .header("Access-Control-Allow-Origin", "*")
+            .body(body)
+            .unwrap()
+    }};
+}
+
 /// Pick RPC and send request to it. In case the result is cached,
 /// read and return from the cache.
 async fn forward_body(
@@ -399,7 +417,29 @@ async fn forward_body(
 
     if tx.is_array() {
         // is probably a batch request. forget about caching and proxy directly.
-        // TODO: group requests in batch by route group ?
+
+        // figure out which route group this batch is for
+        // Note: we only support all requests in the batch to be for the same group.
+        let mut group_iter = tx.as_array().unwrap().iter().map(|tx| {
+            tx.get("method")
+                .and_then(Value::as_str)
+                .map(RouteGroup::from_method_name)
+                .unwrap_or_default()
+        });
+
+        let route_group = if let Some(first) = group_iter.next() {
+            if group_iter.any(|group| group != first) {
+                // error
+                return (
+                    Ok(build_json_response!(400, "{\"code\":-32009, \"message\":\"error: all requests in batch must be for same group!\"}")),
+                    None,
+                );
+            }
+            first
+        } else {
+            // empty batch request
+            return (Ok(build_json_response!(200, "[]")), None);
+        };
 
         // RPC used to get the response, we use it to update the latency for it later.
         let mut rpc_position;
@@ -408,14 +448,14 @@ async fn forward_body(
             tx,
             rpc_list_rwlock,
             rpc_position,
-            RouteGroup::Ethereum,
+            route_group,
             params.ttl,
             params.max_retries
         );
-        
-        let res = build_response(rax);
 
-        return (Ok(res), rpc_position)
+        let res = build_json_response!(200, rax);
+
+        return (Ok(res), rpc_position);
     }
 
     // Get the id of the request and set it to 0 for caching
@@ -457,27 +497,9 @@ async fn forward_body(
         params.max_retries
     );
 
-    let res = build_response(rax);
+    let res = build_json_response!(200, rax);
 
     (Ok(res), rpc_position)
-}
-
-fn build_response(raw: String) -> hyper::Response<Full<Bytes>> {
-    // Convert rx to bytes and but it in a Buf
-    let body = hyper::body::Bytes::from(raw);
-
-    // Put it in a http_body_util::Full
-    let body = Full::new(body);
-
-    // Build the response
-    let res = hyper::Response::builder()
-        .status(200)
-        .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
-        .body(body)
-        .unwrap();
-
-    res
 }
 
 /// Forward the request to *a* RPC picked by the algo set by the user.
