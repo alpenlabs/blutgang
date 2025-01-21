@@ -309,6 +309,79 @@ macro_rules! fetch_from_rpc {
     }};
 }
 
+macro_rules! fetch_from_rpc_uncached {
+    (
+        $tx:expr,
+        $rpc_list_rwlock:expr,
+        $rpc_position:expr,
+        $route_group:expr,
+        $ttl:expr,
+        $max_retries:expr
+    ) => {{
+        // Loop until we get a response
+        let rx;
+        let mut retries = 0;
+        loop {
+            // Get the next Rpc in line.
+            let mut rpc;
+            {
+                let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                (rpc, $rpc_position) = pick(&mut rpc_list, &$route_group);
+            }
+            log_info!("Forwarding to: {}", rpc.name);
+
+            // Check if we have any RPCs in the list, if not return error
+            if $rpc_position == None {
+                return (no_rpc_available!(), None);
+            }
+
+            // Send the request. And return a timeout if it takes too long
+            //
+            // Check if it contains any errors or if its `latest` and insert it if it isn't
+            match timeout(
+                Duration::from_millis($ttl.try_into().unwrap()),
+                rpc.send_request($tx.clone()),
+            )
+            .await
+            {
+                Ok(rxa) => {
+                    rx = rxa.unwrap();
+                    break;
+                },
+                Err(_) => {
+                    log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                    rpc.update_latency($ttl as f64);
+                    retries += 1;
+                },
+            };
+
+            if retries == $max_retries {
+                return (timed_out!(), $rpc_position,);
+            }
+        }
+
+        rx
+    }};
+}
+
+macro_rules! build_json_response {
+    ($status:expr, $raw:expr) => {{
+        // Convert rx to bytes and but it in a Buf
+        let body = hyper::body::Bytes::from($raw);
+
+        // Put it in a http_body_util::Full
+        let body = Full::new(body);
+
+        // Build the response
+        hyper::Response::builder()
+            .status($status)
+            .header("Content-Type", "application/json")
+            .header("Access-Control-Allow-Origin", "*")
+            .body(body)
+            .unwrap()
+    }};
+}
+
 /// Pick RPC and send request to it. In case the result is cached,
 /// read and return from the cache.
 async fn forward_body(
@@ -341,6 +414,49 @@ async fn forward_body(
     // Convert incoming body to serde value
     let mut tx = incoming_to_value(tx).await.unwrap();
     log_info!("converted incoming_to value: {:?}", tx);
+
+    if tx.is_array() {
+        // is probably a batch request. forget about caching and proxy directly.
+
+        // figure out which route group this batch is for
+        // Note: we only support all requests in the batch to be for the same group.
+        let mut group_iter = tx.as_array().unwrap().iter().map(|tx| {
+            tx.get("method")
+                .and_then(Value::as_str)
+                .map(RouteGroup::from_method_name)
+                .unwrap_or_default()
+        });
+
+        let route_group = if let Some(first) = group_iter.next() {
+            if group_iter.any(|group| group != first) {
+                // error
+                return (
+                    Ok(build_json_response!(400, "{\"code\":-32009, \"message\":\"error: all requests in batch must be for same group!\"}")),
+                    None,
+                );
+            }
+            first
+        } else {
+            // empty batch request
+            return (Ok(build_json_response!(200, "[]")), None);
+        };
+
+        // RPC used to get the response, we use it to update the latency for it later.
+        let mut rpc_position;
+
+        let rax = fetch_from_rpc_uncached!(
+            tx,
+            rpc_list_rwlock,
+            rpc_position,
+            route_group,
+            params.ttl,
+            params.max_retries
+        );
+
+        let res = build_json_response!(200, rax);
+
+        return (Ok(res), rpc_position);
+    }
 
     // Get the id of the request and set it to 0 for caching
     //
@@ -381,19 +497,7 @@ async fn forward_body(
         params.max_retries
     );
 
-    // Convert rx to bytes and but it in a Buf
-    let body = hyper::body::Bytes::from(rax);
-
-    // Put it in a http_body_util::Full
-    let body = Full::new(body);
-
-    // Build the response
-    let res = hyper::Response::builder()
-        .status(200)
-        .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
-        .body(body)
-        .unwrap();
+    let res = build_json_response!(200, rax);
 
     (Ok(res), rpc_position)
 }
