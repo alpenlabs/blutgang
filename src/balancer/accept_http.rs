@@ -300,7 +300,7 @@ macro_rules! fetch_from_rpc_uncached {
                 let mut rpc_list = $rpc_list_rwlock.write().unwrap();
                 (rpc, $rpc_position) = pick(&mut rpc_list, &$route_group);
             }
-            log_info!("Forwarding to: {}", rpc.name);
+            tracing::info!("Forwarding to: {}", rpc.name);
 
             // Check if we have any RPCs in the list, if not return error
             if $rpc_position == None {
@@ -321,7 +321,7 @@ macro_rules! fetch_from_rpc_uncached {
                     break;
                 },
                 Err(_) => {
-                    log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                    tracing::warn!("An RPC request has timed out, picking new RPC and retrying.");
                     rpc.update_latency($ttl as f64);
                     retries += 1;
                 },
@@ -420,7 +420,7 @@ where
 
         let rax = fetch_from_rpc_uncached!(
             tx,
-            rpc_list_rwlock,
+            con_params.rpc_list,
             rpc_position,
             route_group,
             params.ttl,

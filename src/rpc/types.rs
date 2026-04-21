@@ -57,7 +57,7 @@ impl RouteGroup {
         }
     }
 
-    pub fn from_config(group: Option<&str>) -> Result<Self, RouteGroupError> {
+    pub fn from_config(group: Option<&str>) -> Result<Self, RouteGroupError<'_>> {
         match group {
             Some("strata") => Ok(Self::StrataCL),
             Some("bundler") => Ok(Self::Bundler),
