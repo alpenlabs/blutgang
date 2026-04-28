@@ -125,6 +125,13 @@ pub async fn move_subscriptions(
     while !pairs.is_empty() {
         let response = rx.recv().await?;
 
+        // Skip subscription notifications (eth_subscription) which are
+        // server-initiated and have no "id" field per JSON-RPC 2.0 spec.
+        if response.content["method"].eq(&EthRpcMethod::Subscription) {
+            tracing::debug!("Skipping subscription notification during move_subscriptions: {}", response.content);
+            continue;
+        }
+
         // Discard any response that does not have a proper ID
         let pair_id = match response.content["id"].as_u64() {
             Some(rax) => rax as u32,
